@@ -7,6 +7,8 @@ description = "A tool to find duplicated dependencies in Cargo.toml"
 repository = "https://github.com/arihant2math/cargo-duplicated-deps"
 categories = ["command-line-utilities", "development-tools::cargo-plugins"]
 readme = "README.md"
+authors = ["Ashwin Naren <arihant2math@gmail.com>"]
+keywords = ["cargo", "dependencies", "tool"]
 
 [dependencies]
 cargo-lock = "10.0"
