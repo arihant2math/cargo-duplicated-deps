@@ -2,6 +2,12 @@
 name = "cargo-duplicated-deps"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A tool to find duplicated dependencies in Cargo.toml"
+repository = "https://github.com/arihant2math/cargo-duplicated-deps"
+categories = ["command-line-utilities", "development-tools::cargo-plugins"]
+include = ["/src", "/Cargo.toml", "/Cargo.lock"]
+readme = "README.md"
 
 [dependencies]
 cargo-lock = "10.0"
