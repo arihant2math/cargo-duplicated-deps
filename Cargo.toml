@@ -6,7 +6,6 @@ license = "MIT"
 description = "A tool to find duplicated dependencies in Cargo.toml"
 repository = "https://github.com/arihant2math/cargo-duplicated-deps"
 categories = ["command-line-utilities", "development-tools::cargo-plugins"]
-include = ["/src", "/Cargo.toml", "/Cargo.lock"]
 readme = "README.md"
 
 [dependencies]
