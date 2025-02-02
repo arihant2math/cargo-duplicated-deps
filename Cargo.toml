@@ -11,5 +11,5 @@ authors = ["Ashwin Naren <arihant2math@gmail.com>"]
 keywords = ["cargo", "dependencies", "tool"]
 
 [dependencies]
-cargo-lock = "10.0"
+cargo-lock = "10.1"
 semver = "1.0"
