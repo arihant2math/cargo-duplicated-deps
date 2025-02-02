@@ -10,13 +10,13 @@ struct PackageInfo {
 
 fn get_usage_chain(package_map: &HashMap<String, Vec<PackageInfo>>, package: &Package) -> String {
     let mut chain = vec![format!("{} ({})", package.name.as_str(), package.version.to_string())];
-    let mut current = package_map.get(package.name.as_str()).unwrap().into_iter().find(|info| info.version == package.version.to_string()).unwrap();
+    let mut current = package_map.get(package.name.as_str()).unwrap().iter().find(|info| info.version == package.version.to_string()).unwrap();
     loop {
         let next = current.users.iter().find(|user| {
             if let Some(info) = package_map.get(user.name.as_str()) {
                 if info.iter().any(|info| info.version == user.version.to_string()) {
-                    current = package_map.get(user.name.as_str()).unwrap().into_iter().find(|info| info.version == user.version.to_string()).unwrap();
-                    chain.push(format!("{} ({})", user.name.as_str(), user.version.to_string()));
+                    current = package_map.get(user.name.as_str()).unwrap().iter().find(|info| info.version == user.version.to_string()).unwrap();
+                    chain.push(format!("{} ({})", user.name.as_str(), user.version));
                     true
                 } else {
                     false
@@ -62,23 +62,23 @@ fn main() {
         }
     }
     // sort by package name
-    let mut keys: Vec<String> = package_map.keys().map(|s| s.clone()).collect();
+    let mut keys: Vec<String> = package_map.keys().cloned().collect();
     keys.sort();
     for key in keys {
         let value = package_map.get(key.as_str()).unwrap();
         if value.len() > 1 {
             // Find the latest version
             let mut latest = Version::parse(&value[0].version).unwrap();
-            for info in value.iter() {
+            for info in value {
                 let info_version = Version::parse(&info.version).unwrap();
                 if info_version > latest {
                     latest = info_version;
                 }
             }
-            for info in value.iter() {
+            for info in value {
                 if Version::parse(&info.version).unwrap() != latest {
                     println!("{} ({}) {} packages", key, info.version, info.users.len());
-                    for user in info.users.iter() {
+                    for user in &info.users {
                         println!("  - {}", get_usage_chain(&package_map, user));
                     }
                 }
