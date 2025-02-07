@@ -144,7 +144,7 @@ async fn main() -> anyhow::Result<()> {
     let mut keys: Vec<String> = package_map.keys().cloned().collect();
     keys.sort();
     let mut duplicates = vec![];
-    let client = Client::new();
+    let client = Client::builder().user_agent("cargo-duplicated-deps").build()?;
     for key in keys {
         let value = package_map.get(key.as_str()).unwrap();
         if value.len() > 1 {
