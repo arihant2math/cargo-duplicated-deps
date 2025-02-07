@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{stdout, IsTerminal};
 use std::path::PathBuf;
+use std::str::FromStr;
 use anyhow::bail;
 use cargo_lock::{Lockfile, Package};
 use clap::{Parser, ValueEnum};
@@ -11,12 +12,12 @@ use reqwest::Client;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-async fn get_latest_version(client: &Client, package: &str) -> String {
+async fn get_latest_version(client: &Client, package: &str) -> anyhow::Result<String> {
     let url = format!("https://crates.io/api/v1/crates/{}", package);
-    let response = client.execute(client.get(&url).build().unwrap()).await.unwrap();
-    let json: serde_json::Value = response.json().await.unwrap();
-    let latest_version = json["crate"]["newest_version"].as_str().unwrap();
-    latest_version.to_string()
+    let response = client.execute(client.get(&url).build()?).await?;
+    let json: serde_json::Value = response.json().await?;
+    let latest_version = json["crate"]["newest_version"].as_str().ok_or(anyhow::anyhow!("No version found"))?;
+    Ok(latest_version.to_string())
 }
 
 #[derive(Clone, Debug)]
