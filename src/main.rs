@@ -1,5 +1,11 @@
 use std::collections::HashMap;
+use std::io::{stdout, IsTerminal};
+use std::path::PathBuf;
+use anyhow::bail;
 use cargo_lock::{Lockfile, Package};
+use clap::Parser;
+use crossterm::execute;
+use crossterm::style::{SetForegroundColor, ResetColor, Color, Print};
 use semver::Version;
 
 #[derive(Clone, Debug)]
@@ -9,14 +15,14 @@ struct PackageInfo {
 }
 
 fn get_usage_chain(package_map: &HashMap<String, Vec<PackageInfo>>, package: &Package) -> String {
-    let mut chain = vec![format!("{} ({})", package.name.as_str(), package.version.to_string())];
+    let mut chain = vec![format!("{} v{}", package.name.as_str(), package.version.to_string())];
     let mut current = package_map.get(package.name.as_str()).unwrap().iter().find(|info| info.version == package.version.to_string()).unwrap();
     loop {
         let next = current.users.iter().find(|user| {
             if let Some(info) = package_map.get(user.name.as_str()) {
                 if info.iter().any(|info| info.version == user.version.to_string()) {
                     current = package_map.get(user.name.as_str()).unwrap().iter().find(|info| info.version == user.version.to_string()).unwrap();
-                    chain.push(format!("{} ({})", user.name.as_str(), user.version));
+                    chain.push(format!("{} v{}", user.name.as_str(), user.version));
                     true
                 } else {
                     false
@@ -71,6 +77,7 @@ fn main() -> anyhow::Result<()> {
     let lockfile = Lockfile::load(path)?;
 
     let mut package_map: HashMap<String, Vec<PackageInfo>> = HashMap::new();
+
     // Pass 1: insert package versions
     for package in &lockfile.packages {
         let info = PackageInfo {
@@ -83,6 +90,7 @@ fn main() -> anyhow::Result<()> {
             package_map.insert(package.name.to_string(), vec![info]);
         }
     }
+
     // Pass 2: insert users
     for package in &lockfile.packages {
         for dep in &package.dependencies {
@@ -97,6 +105,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
     }
+
     // sort by package name
     let mut keys: Vec<String> = package_map.keys().cloned().collect();
     keys.sort();
@@ -104,16 +113,43 @@ fn main() -> anyhow::Result<()> {
         let value = package_map.get(key.as_str()).unwrap();
         if value.len() > 1 {
             // Find the latest version
-            let mut latest = Version::parse(&value[0].version).unwrap();
+            let mut latest = Version::parse(&value[0].version)?;
             for info in value {
-                let info_version = Version::parse(&info.version).unwrap();
+                let info_version = Version::parse(&info.version)?;
                 if info_version > latest {
                     latest = info_version;
                 }
             }
             for info in value {
-                if Version::parse(&info.version).unwrap() != latest {
-                    println!("{} ({}) {} packages", key, info.version, info.users.len());
+                if Version::parse(&info.version)? != latest {
+                    let package_text = if info.users.len() == 1 {
+                        "package"
+                    } else {
+                        "packages"
+                    };
+                    if args.color.unwrap_or(stdout().is_terminal()) {
+                        execute!(
+                            stdout(),
+                            SetForegroundColor(Color::DarkCyan),
+                            Print(&key),
+                            Print(" "),
+                            ResetColor,
+                            Print(format!("v{}", info.version)),
+                            Print(" "),
+                            Print("used by"),
+                            Print(" "),
+                            Print(info.users.len()),
+                            Print(" "),
+                            Print(package_text),
+                            Print(" "),
+                            SetForegroundColor(Color::DarkYellow),
+                            Print(format!("(available: v{})", latest)),
+                            ResetColor,
+                        )?;
+                        println!();
+                    } else {
+                        println!("{key} v{} used by {} {package_text} (available: v{})", info.version, info.users.len(), latest);
+                    }
                     for user in &info.users {
                         println!("  - {}", get_usage_chain(&package_map, user));
                     }
@@ -121,4 +157,6 @@ fn main() -> anyhow::Result<()> {
             }
         }
     }
+
+    Ok(())
 }
