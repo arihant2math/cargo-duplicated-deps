@@ -91,16 +91,16 @@ struct Arguments {
     path: Option<PathBuf>,
     #[arg(short, long)]
     color: Option<bool>,
-    #[arg(short, long)]
+    #[arg(long)]
     offline: bool,
     #[arg(short, long)]
     verbose: bool,
-    #[arg(short, long, default_value_t = Output::Text)]
+    #[arg(long, default_value_t = Output::Text)]
     output: Output,
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn run() -> anyhow::Result<()> {
     color_eyre::install().map_err(|e| anyhow::anyhow!(e))?;
     let args = Arguments::parse();
     let path = args.path.unwrap_or_else(|| PathBuf::from("Cargo.lock"));
@@ -221,4 +221,11 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }
