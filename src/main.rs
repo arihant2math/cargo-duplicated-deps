@@ -108,7 +108,7 @@ async fn main() -> anyhow::Result<()> {
         bail!("{} does not exist", path.display());
     }
 
-    let lockfile = Lockfile::load(path)?;
+    let lockfile = Lockfile::from_str(&tokio::fs::read_to_string(path).await?)?;
 
     let mut package_map: HashMap<String, Vec<PackageInfo>> = HashMap::new();
 
