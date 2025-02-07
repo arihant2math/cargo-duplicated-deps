@@ -7,14 +7,14 @@ use cargo_lock::{Lockfile, Package};
 use clap::{Parser, ValueEnum};
 use crossterm::execute;
 use crossterm::style::{SetForegroundColor, ResetColor, Color, Print};
+use reqwest::Client;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-fn get_latest_version(package: &str) -> String {
+async fn get_latest_version(client: &Client, package: &str) -> String {
     let url = format!("https://crates.io/api/v1/crates/{}", package);
-    let mut response = ureq::get(&url).call().unwrap();
-    let body = response.body_mut();
-    let json: serde_json::Value = serde_json::from_reader(body.as_reader()).unwrap();
+    let response = client.execute(client.get(&url).build().unwrap()).await.unwrap();
+    let json: serde_json::Value = response.json().await.unwrap();
     let latest_version = json["crate"]["newest_version"].as_str().unwrap();
     latest_version.to_string()
 }
@@ -144,11 +144,12 @@ async fn main() -> anyhow::Result<()> {
     let mut keys: Vec<String> = package_map.keys().cloned().collect();
     keys.sort();
     let mut duplicates = vec![];
+    let client = Client::new();
     for key in keys {
         let value = package_map.get(key.as_str()).unwrap();
         if value.len() > 1 {
             // Find the latest version
-            let mut latest = get_latest_version(&key).parse()?;
+            let mut latest = get_latest_version(&client, &key).await.parse()?;
             for info in value {
                 let info_version = Version::parse(&info.version)?;
                 if info_version > latest {
