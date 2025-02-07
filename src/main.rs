@@ -101,7 +101,7 @@ struct Arguments {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    color_eyre::install().unwrap();
+    color_eyre::install().map_err(|e| anyhow::anyhow!(e))?;
     let args = Arguments::parse();
     let path = args.path.unwrap_or_else(|| PathBuf::from("Cargo.lock"));
     if args.verbose {
