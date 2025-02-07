@@ -92,6 +92,8 @@ struct Arguments {
     #[arg(short, long)]
     color: Option<bool>,
     #[arg(short, long)]
+    offline: bool,
+    #[arg(short, long)]
     verbose: bool,
     #[arg(short, long, default_value_t = Output::Text)]
     output: Output,
@@ -150,15 +152,15 @@ async fn main() -> anyhow::Result<()> {
         let value = package_map.get(key.as_str()).unwrap();
         if value.len() > 1 {
             // Find the latest version
-            let default_version = value[0].version.clone();
-            let mut latest = get_latest_version(&client, &key).await.unwrap_or(default_version.clone()).parse()?;
+            let default_version = value.iter().max_by_key(|info| Version::parse(&info.version).unwrap()).unwrap().version.clone();
+            let latest = if args.offline {
+                default_version.clone()
+            } else {
+                get_latest_version(&client, &key).await.unwrap_or(default_version.clone())
+            };
             let default_version = Version::parse(&default_version)?;
-            for info in value {
-                let info_version = Version::parse(&info.version)?;
-                if info_version > latest {
-                    latest = info_version;
-                }
-            }
+            let latest = Version::parse(&latest)?;
+
             for info in value {
                 if Version::parse(&info.version)? != default_version {
                     let mut dup_info = Duplicate {
