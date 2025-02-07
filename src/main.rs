@@ -149,7 +149,8 @@ async fn main() -> anyhow::Result<()> {
         let value = package_map.get(key.as_str()).unwrap();
         if value.len() > 1 {
             // Find the latest version
-            let mut latest = get_latest_version(&client, &key).await.parse()?;
+            let default_version = value[0].version.clone();
+            let mut latest = get_latest_version(&client, &key).await.unwrap_or(default_version).parse()?;
             for info in value {
                 let info_version = Version::parse(&info.version)?;
                 if info_version > latest {
