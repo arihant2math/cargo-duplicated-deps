@@ -32,8 +32,44 @@ fn get_usage_chain(package_map: &HashMap<String, Vec<PackageInfo>>, package: &Pa
     chain.join(" -> ")
 }
 
-fn main() {
-    let lockfile = Lockfile::load("Cargo.lock").unwrap();
+#[derive(Clone, Debug)]
+enum Output {
+    Text,
+    Json,
+}
+
+impl Default for Output {
+    fn default() -> Self {
+        Output::Text
+    }
+}
+
+#[derive(Parser)]
+struct Arguments {
+    _call: Option<String>,
+    #[arg(short, long)]
+    path: Option<PathBuf>,
+    #[arg(short, long)]
+    color: Option<bool>,
+    #[arg(short, long)]
+    verbose: bool,
+    #[arg(short, long, default)]
+    output: Output,
+}
+
+fn main() -> anyhow::Result<()> {
+    color_eyre::install().unwrap();
+    let args = Arguments::parse();
+    let path = args.path.unwrap_or_else(|| PathBuf::from("Cargo.lock"));
+    if args.verbose {
+        println!("Reading lockfile from {}", path.display());
+    }
+    if !path.exists() {
+        bail!("{} does not exist", path.display());
+    }
+
+    let lockfile = Lockfile::load(path)?;
+
     let mut package_map: HashMap<String, Vec<PackageInfo>> = HashMap::new();
     // Pass 1: insert package versions
     for package in &lockfile.packages {
