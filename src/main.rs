@@ -151,7 +151,8 @@ async fn main() -> anyhow::Result<()> {
         if value.len() > 1 {
             // Find the latest version
             let default_version = value[0].version.clone();
-            let mut latest = get_latest_version(&client, &key).await.unwrap_or(default_version).parse()?;
+            let mut latest = get_latest_version(&client, &key).await.unwrap_or(default_version.clone()).parse()?;
+            let default_version = Version::parse(&default_version)?;
             for info in value {
                 let info_version = Version::parse(&info.version)?;
                 if info_version > latest {
@@ -159,7 +160,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             for info in value {
-                if Version::parse(&info.version)? != latest {
+                if Version::parse(&info.version)? != default_version {
                     let mut dup_info = Duplicate {
                         package: key.clone(),
                         version: info.version.clone(),
