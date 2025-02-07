@@ -7,6 +7,7 @@ use clap::Parser;
 use crossterm::execute;
 use crossterm::style::{SetForegroundColor, ResetColor, Color, Print};
 use semver::Version;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 struct PackageInfo {
@@ -50,6 +51,18 @@ impl Default for Output {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Duplicate {
+    pub package: String,
+    pub version: String,
+    pub users: Vec<Package>
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Response {
+    pub duplicates: Vec<Duplicate>
+}
+
 #[derive(Parser)]
 struct Arguments {
     _call: Option<String>,
@@ -63,7 +76,8 @@ struct Arguments {
     output: Output,
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     color_eyre::install().unwrap();
     let args = Arguments::parse();
     let path = args.path.unwrap_or_else(|| PathBuf::from("Cargo.lock"));
@@ -109,6 +123,7 @@ fn main() -> anyhow::Result<()> {
     // sort by package name
     let mut keys: Vec<String> = package_map.keys().cloned().collect();
     keys.sort();
+    let mut duplicates = vec![];
     for key in keys {
         let value = package_map.get(key.as_str()).unwrap();
         if value.len() > 1 {
@@ -122,23 +137,45 @@ fn main() -> anyhow::Result<()> {
             }
             for info in value {
                 if Version::parse(&info.version)? != latest {
-                    let package_text = if info.users.len() == 1 {
-                        "package"
-                    } else {
-                        "packages"
+                    let mut dup_info = Duplicate {
+                        package: key.clone(),
+                        version: info.version.clone(),
+                        users: vec![],
                     };
-                    if args.color.unwrap_or(stdout().is_terminal()) {
-                        execute!(
+                    for user in &info.users {
+                        dup_info.users.push(user.clone());
+                    }
+                    duplicates.push(dup_info);
+                }
+            }
+        }
+    }
+
+    if let Output::Json = args.output {
+        let response = Response {
+            duplicates
+        };
+        println!("{}", serde_json::to_string_pretty(&response)?);
+    } else {
+        let latest = "0.0.0";
+        for duplicate in duplicates {
+            let package_text = if duplicate.users.len() == 1 {
+                "package"
+            } else {
+                "packages"
+            };
+            if args.color.unwrap_or(stdout().is_terminal()) {
+                execute!(
                             stdout(),
                             SetForegroundColor(Color::DarkCyan),
-                            Print(&key),
+                            Print(&duplicate.package),
                             Print(" "),
                             ResetColor,
-                            Print(format!("v{}", info.version)),
+                            Print(format!("v{}", duplicate.version)),
                             Print(" "),
                             Print("used by"),
                             Print(" "),
-                            Print(info.users.len()),
+                            Print(duplicate.users.len()),
                             Print(" "),
                             Print(package_text),
                             Print(" "),
@@ -146,14 +183,12 @@ fn main() -> anyhow::Result<()> {
                             Print(format!("(available: v{})", latest)),
                             ResetColor,
                         )?;
-                        println!();
-                    } else {
-                        println!("{key} v{} used by {} {package_text} (available: v{})", info.version, info.users.len(), latest);
-                    }
-                    for user in &info.users {
-                        println!("  - {}", get_usage_chain(&package_map, user));
-                    }
-                }
+                println!();
+            } else {
+                println!("{} v{} used by {} {package_text} (available: v{})", duplicate.package, duplicate.version, duplicate.users.len(), latest);
+            }
+            for user in &duplicate.users {
+                println!("  - {}", get_usage_chain(&package_map, user));
             }
         }
     }
