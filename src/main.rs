@@ -1,39 +1,58 @@
+use anyhow::bail;
+use cargo_lock::{Lockfile, Package};
+use clap::{Parser, ValueEnum};
+use crossterm::execute;
+use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
+use reqwest::Client;
+use semver::Version;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{stdout, IsTerminal};
 use std::path::PathBuf;
 use std::str::FromStr;
-use anyhow::bail;
-use cargo_lock::{Lockfile, Package};
-use clap::{Parser, ValueEnum};
-use crossterm::execute;
-use crossterm::style::{SetForegroundColor, ResetColor, Color, Print};
-use reqwest::Client;
-use semver::Version;
-use serde::{Deserialize, Serialize};
 
 async fn get_latest_version(client: &Client, package: &str) -> anyhow::Result<String> {
     let url = format!("https://crates.io/api/v1/crates/{package}");
     let response = client.execute(client.get(&url).build()?).await?;
     let json: serde_json::Value = response.json().await?;
-    let latest_version = json["crate"]["newest_version"].as_str().ok_or(anyhow::anyhow!("No version found"))?;
+    let latest_version = json["crate"]["newest_version"]
+        .as_str()
+        .ok_or(anyhow::anyhow!("No version found"))?;
     Ok(latest_version.to_string())
 }
 
 #[derive(Clone, Debug)]
 struct PackageInfo {
     version: String,
-    users: Vec<Package>
+    users: Vec<Package>,
 }
 
 fn get_usage_chain(package_map: &HashMap<String, Vec<PackageInfo>>, package: &Package) -> String {
-    let mut chain = vec![format!("{} v{}", package.name.as_str(), package.version.to_string())];
-    let mut current = package_map.get(package.name.as_str()).unwrap().iter().find(|info| info.version == package.version.to_string()).unwrap();
+    let mut chain = vec![format!(
+        "{} v{}",
+        package.name.as_str(),
+        package.version.to_string()
+    )];
+    let mut current = package_map
+        .get(package.name.as_str())
+        .unwrap()
+        .iter()
+        .find(|info| info.version == package.version.to_string())
+        .unwrap();
     loop {
         let next = current.users.iter().find(|user| {
             if let Some(info) = package_map.get(user.name.as_str()) {
-                if info.iter().any(|info| info.version == user.version.to_string()) {
-                    current = package_map.get(user.name.as_str()).unwrap().iter().find(|info| info.version == user.version.to_string()).unwrap();
+                if info
+                    .iter()
+                    .any(|info| info.version == user.version.to_string())
+                {
+                    current = package_map
+                        .get(user.name.as_str())
+                        .unwrap()
+                        .iter()
+                        .find(|info| info.version == user.version.to_string())
+                        .unwrap();
                     chain.push(format!("{} v{}", user.name.as_str(), user.version));
                     true
                 } else {
@@ -71,12 +90,12 @@ pub struct Duplicate {
     pub package: String,
     pub version: String,
     pub latest: String,
-    pub users: Vec<Package>
+    pub users: Vec<Package>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Response {
-    pub duplicates: Vec<Duplicate>
+    pub duplicates: Vec<Duplicate>,
 }
 
 #[derive(Parser)]
@@ -114,7 +133,7 @@ async fn run() -> anyhow::Result<()> {
     for package in &lockfile.packages {
         let info = PackageInfo {
             version: package.version.to_string(),
-            users: vec![]
+            users: vec![],
         };
         if let Some(s) = package_map.get_mut(package.name.as_str()) {
             s.push(info);
@@ -142,16 +161,25 @@ async fn run() -> anyhow::Result<()> {
     let mut keys: Vec<String> = package_map.keys().cloned().collect();
     keys.sort();
     let mut duplicates = vec![];
-    let client = Client::builder().user_agent("cargo-duplicated-deps").build()?;
+    let client = Client::builder()
+        .user_agent("cargo-duplicated-deps")
+        .build()?;
     for key in keys {
         let value = package_map.get(key.as_str()).unwrap();
         if value.len() > 1 {
             // Find the latest version
-            let default_version = value.iter().max_by_key(|info| Version::parse(&info.version).unwrap()).unwrap().version.clone();
+            let default_version = value
+                .iter()
+                .max_by_key(|info| Version::parse(&info.version).unwrap())
+                .unwrap()
+                .version
+                .clone();
             let latest = if args.offline {
                 default_version.clone()
             } else {
-                get_latest_version(&client, &key).await.unwrap_or(default_version.clone())
+                get_latest_version(&client, &key)
+                    .await
+                    .unwrap_or(default_version.clone())
             };
             let default_version = Version::parse(&default_version)?;
             let latest = Version::parse(&latest)?;
@@ -174,9 +202,7 @@ async fn run() -> anyhow::Result<()> {
     }
 
     if let Output::Json = args.output {
-        let response = Response {
-            duplicates
-        };
+        let response = Response { duplicates };
         println!("{}", serde_json::to_string_pretty(&response)?);
     } else {
         let color = args.color.unwrap_or(stdout().is_terminal());
@@ -188,26 +214,32 @@ async fn run() -> anyhow::Result<()> {
             };
             if color {
                 execute!(
-                            stdout(),
-                            SetForegroundColor(Color::DarkCyan),
-                            Print(&duplicate.package),
-                            Print(" "),
-                            ResetColor,
-                            Print(format!("v{}", duplicate.version)),
-                            Print(" "),
-                            Print("used by"),
-                            Print(" "),
-                            Print(duplicate.users.len()),
-                            Print(" "),
-                            Print(package_text),
-                            Print(" "),
-                            SetForegroundColor(Color::DarkYellow),
-                            Print(format!("(available: v{})", duplicate.latest)),
-                            ResetColor,
-                        )?;
+                    stdout(),
+                    SetForegroundColor(Color::DarkCyan),
+                    Print(&duplicate.package),
+                    Print(" "),
+                    ResetColor,
+                    Print(format!("v{}", duplicate.version)),
+                    Print(" "),
+                    Print("used by"),
+                    Print(" "),
+                    Print(duplicate.users.len()),
+                    Print(" "),
+                    Print(package_text),
+                    Print(" "),
+                    SetForegroundColor(Color::DarkYellow),
+                    Print(format!("(available: v{})", duplicate.latest)),
+                    ResetColor,
+                )?;
                 println!();
             } else {
-                println!("{} v{} used by {} {package_text} (available: v{})", duplicate.package, duplicate.version, duplicate.users.len(), duplicate.latest);
+                println!(
+                    "{} v{} used by {} {package_text} (available: v{})",
+                    duplicate.package,
+                    duplicate.version,
+                    duplicate.users.len(),
+                    duplicate.latest
+                );
             }
             for user in &duplicate.users {
                 println!("  - {}", get_usage_chain(&package_map, user));
