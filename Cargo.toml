@@ -1,6 +1,6 @@
 [package]
 name = "cargo-duplicated-deps"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 description = "A tool to find duplicated dependencies in Cargo.toml"

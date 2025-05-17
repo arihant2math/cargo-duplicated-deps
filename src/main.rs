@@ -69,7 +69,7 @@ fn get_usage_chain(package_map: &HashMap<String, Vec<PackageInfo>>, package: &Pa
     chain.join(" -> ")
 }
 
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, Debug, Default, ValueEnum)]
 enum Output {
     #[default]
     Text,
