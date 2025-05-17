@@ -13,7 +13,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 
 async fn get_latest_version(client: &Client, package: &str) -> anyhow::Result<String> {
-    let url = format!("https://crates.io/api/v1/crates/{}", package);
+    let url = format!("https://crates.io/api/v1/crates/{package}");
     let response = client.execute(client.get(&url).build()?).await?;
     let json: serde_json::Value = response.json().await?;
     let latest_version = json["crate"]["newest_version"].as_str().ok_or(anyhow::anyhow!("No version found"))?;
@@ -52,14 +52,9 @@ fn get_usage_chain(package_map: &HashMap<String, Vec<PackageInfo>>, package: &Pa
 
 #[derive(Clone, Debug, ValueEnum)]
 enum Output {
+    #[default]
     Text,
     Json,
-}
-
-impl Default for Output {
-    fn default() -> Self {
-        Output::Text
-    }
 }
 
 impl Display for Output {
